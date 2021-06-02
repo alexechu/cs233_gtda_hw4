@@ -19,7 +19,7 @@ class MLP(nn.Module):
     or other non-requested features, for the non-bonus question.
     """
 
-    def __init__(self, in_feat_dims, out_channels, b_norm=False, dropout_rate=0, non_linearity=nn.ReLU(inplace=True)):
+    def __init__(self, in_feat_dims=128, out_channels=1024, b_norm=False, dropout_rate=0, non_linearity=nn.ReLU(inplace=True)):
         """Constructor
         :param in_feat_dims: input feature dimensions
         :param out_channels: list of ints describing each the number hidden/final neurons.
@@ -28,4 +28,18 @@ class MLP(nn.Module):
         :param non_linearity: nn.Module
         """
         super(MLP, self).__init__()
-        raise NotImplementedError
+        self.layers = nn.Sequential(
+            nn.Linear(in_feat_dims, 256),
+            non_linearity,
+            nn.Linear(256, 384),
+            non_linearity,
+            nn.Linear(384, out_channels),
+            non_linearity
+        )
+        self.upsize = nn.ConvTranspose1d(1, 3, 1, 1, 0)
+        
+    def forward(self, x):
+        x=  self.layers(x)
+        x = x.unsqueeze(1)
+        # print('preupsize', x.shape)
+        return self.upsize(x)
