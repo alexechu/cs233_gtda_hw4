@@ -55,7 +55,7 @@ class PointcloudAutoencoder(nn.Module):
         loss_meter = AverageMeter()
         for batch in tqdm(loader):
             optimizer.zero_grad()
-            pc = batch['point_cloud']
+            pc = batch['point_cloud'].to(device)
             # for k, v in batch.items():
             #     if isinstance(v, torch.Tensor): print(k, v.shape)
             #     else: print(k, len(v[0]))
@@ -78,5 +78,5 @@ class PointcloudAutoencoder(nn.Module):
         # print('embedded', x.shape)
         x= self.decoder(x.squeeze(-1))
         # print('recon', x.shape)
-        return x.transpose(-1, -2)
+        return x.transpose(-1, -2).to(device)
 

@@ -27,13 +27,6 @@ from cs233_gtda_hw4.models import PartAwarePointcloudAutoencoder
 from cs233_gtda_hw4.models.point_net import PointNet
 from cs233_gtda_hw4.models.mlp import MLP
 
-#get_ipython().run_line_magic('load_ext', 'autoreload')
-#get_ipython().run_line_magic('autoreload', '2')
-
-
-# In[2]:
-
-
 ##
 ## Fixed Settings (we do not expect you to change these)
 ## 
@@ -52,13 +45,8 @@ part_lambda = 0.005  # for the part-aware AE you will be using (summing) two los
 init_lr = 0.009  # initial learning-rate, tested by us with ADAM optimizer (see below)
 
 
-# In[3]:
-
-
-## Students: feel free to change below:
-
 # batch-size of data loaders
-batch_size = 1 # if you can keep this too as is keep it, 
+batch_size = 150 # if you can keep this too as is keep it, 
                  # but if it is too big for your GPU, feel free to change it.
 
 # which device to use: cpu or cuda?
@@ -95,7 +83,7 @@ part_aware_model = False
 
 if part_aware_model:
     xentropy = nn.CrossEntropyLoss()
-    model = PartAwarePointcloudAutoencoder().to(device) # Students Work here
+    model = PartAwarePointcloudAutoencoder(encoder, decoder, xentropy).to(device) # Students Work here
     model_tag = 'part_pc_ae'
 else:
     model = PointcloudAutoencoder(encoder, decoder).to(device)  # Students Work here
@@ -108,41 +96,22 @@ else:
 optimizer = optim.Adam(model.parameters(), lr=init_lr)  # Students uncomment once you have defined your model
 
 
-# In[10]:
-
-
-## Train for multiple epochs your model.
-# Students: the below for-loops are optional, feel free to structure your training 
-# differently.
-
-min_val_loss = np.Inf
-out_file = osp.join(top_out_dir, model_tag + '_best_model.pth')
-start_epoch = 1
-
-# for epoch in tqdm.tqdm(range(start_epoch, start_epoch + n_train_epochs)):
-for epoch in range(start_epoch, start_epoch + n_train_epochs):
-    for phase in ['train', 'val', 'test']:
-        
-        # Students Work Here.
-        recon_loss = model.train_for_one_epoch(loaders[phase], optimizer, device)
-
-#       Save model if validation loss improved.
-        if phase == 'val' and recon_loss < min_val_loss:
-            min_val_loss = recon_loss
-            
-#        If you save the model like this, you can use the next peace to load it. 
-            save_state_dicts(out_file, epoch=epoch, model=model) 
-
-
-# In[ ]:
-
-
+out_file = '../data/out/pc_ae_best_model.pth'
 # Load model with best per-validation loss (uncomment when ready)
 best_epoch = load_state_dicts(out_file, model=model)
 print('per-validation optimal epoch', best_epoch)
 
-
-
+bs = []
+for b in loaders['test']:
+    bs.append(b)
+testset = bs[0]
+embeddings = model.embed(testset['point_cloud'].to(device)).squeeze().detach().cpu().numpy()
+np.save('testsetembeddings.npy', embeddings)
+from sklearn.manifold import TSNE
+tsne = TSNE().fit_transform(embeddings)
+plt.close(plt.gcf())
+plt.scatter(tsne[:, 0], tsne[:, 1])
+plt.savefig('tsne1.pdf')
 
 # MAKE your plots and analysis
 
@@ -155,8 +124,20 @@ examples_to_visualize = ['8a67fd47001e52414c350d7ea5fe2a3a',
 
 # You can (also) use the function for the reconstructions or the part-predictions 
 # (for the latter check the kwargs parameter 'c' of matplotlib.
-    # plot_3d_point_cloud, eg. try plot_3d_point_cloud(loaders['test'].dataset.pointclouds[0])
-
+def getidx(n):
+    ds = loaders['test'].dataset
+    for i in range(loaders['test'].dataset.__len__()):
+        if loaders['test'].dataset.model_names[i] == n:
+            return i
+examples_to_visualize = [getidx(n) for n in examples_to_visualize]
+vis_pcs = [torch.Tensor(loaders['test'].dataset.pointclouds[ex]) for ex in examples_to_visualize]
+print(vis_pcs[0].shape)
+vis_recons = model.reconstruct(torch.stack(vis_pcs).to(device)).detach().cpu().numpy()
+for i,ex in enumerate(examples_to_visualize):
+    plot_3d_point_cloud(loaders['test'].dataset.pointclouds[ex], show=False)
+    plt.savefig(f'{ex}_plottedpc.pdf')
+    plot_3d_point_cloud(vis_recons[i], show=False)
+    plt.savefig(f'{ex}_plottedrecon.pdf')
 
 
 
