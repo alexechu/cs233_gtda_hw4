@@ -40,7 +40,7 @@ from cs233_gtda_hw4.models.mlp import MLP
 
 n_points = 1024  # number of points of each point-cloud
 n_parts = 4      # max number of parts of each shape
-n_train_epochs = 40
+n_train_epochs = 400
 
 # Students: feel free to change below -ONLY- for the bonus Question:
 # I.e., use THESE hyper-parameters when you train for the non-bonus questions.
@@ -70,7 +70,6 @@ top_in_dir = '../data/'
 top_out_dir = '../data/out/'
 
 
-# In[4]:
 
 
 # PREPARE DATA:
@@ -90,11 +89,12 @@ part_classifier = MLP(128, n_points)
 # In[5]:
 
 
-# part_aware_model = True
-part_aware_model = False
+part_aware_model = True
+#part_aware_model = False
 
 if part_aware_model:
     xentropy = nn.CrossEntropyLoss()
+    print(device)
     model = PartAwarePointcloudAutoencoder(encoder, decoder, xentropy).to(device) # Students Work here
     model_tag = 'part_pc_ae'
 else:
@@ -126,7 +126,7 @@ for epoch in range(start_epoch, start_epoch + n_train_epochs):
     for phasei, phase in enumerate(['train', 'val', 'test']):
         
         # Students Work Here.
-	opter = optimizer if phase == 'train' else None
+        opter = optimizer if phase == 'train' else None
         recon_loss = model.train_for_one_epoch(loaders[phase], opter, device)
         losses[phasei, epoch-start_epoch] = recon_loss.detach().cpu().numpy()
 
@@ -137,12 +137,12 @@ for epoch in range(start_epoch, start_epoch + n_train_epochs):
 #        If you save the model like this, you can use the next peace to load it. 
             save_state_dicts(out_file, epoch=epoch, model=model) 
 
-np.save('losses.npy', losses)
+np.save(f'{model_tag}_losses.npy', losses)
 plt.close(plt.gcf())
 for i, x in enumerate(['train', 'val', 'test']):
     plt.plot(losses[i], label=x)
 plt.legend()
-plt.savefig('losses.pdf')
+plt.savefig(f'{model_tag}_losses.pdf')
 
 
 # Load model with best per-validation loss (uncomment when ready)

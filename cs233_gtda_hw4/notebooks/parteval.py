@@ -10,6 +10,7 @@ import tqdm
 import matplotlib.pylab as plt
 from torch import nn
 from torch import optim
+import torch.nn.functional as F
 from collections import defaultdict
 print(torch.__version__)
 print(torch.cuda.is_available())
@@ -106,13 +107,24 @@ bs = []
 for b in loaders['test']:
     bs.append(b)
 testset = bs[0]
-embeddings = model.embed(testset['point_cloud'].to(device)).squeeze().detach().cpu().numpy()
+testpc=testset['point_cloud'].to(device)
+z = model.embed(testpc)
+embeddings = z.squeeze().detach().cpu().numpy()
 np.save(f'{model_tag}_testsetembeddings.npy', embeddings)
 from sklearn.manifold import TSNE
 tsne = TSNE().fit_transform(embeddings)
 plt.close(plt.gcf())
 plt.scatter(tsne[:, 0], tsne[:, 1])
 plt.savefig(f'{model_tag}_tsne1.pdf')
+
+pred = model.predict(z, testpc)
+print(pred.shape)
+#pred = (-pred).exp().argmax(dim=1)
+pred = F.log_softmax(pred, dim=1).argmax(dim=1)
+print('accuracy:')
+correct = (pred==testset['part_mask'].to(device)).sum().float()
+total = float(n_points * batch_size)
+print(correct/total)
 
 # MAKE your plots and analysis
 
@@ -132,11 +144,13 @@ def getidx(n):
             return i
 examples_to_visualize = [getidx(n) for n in examples_to_visualize]
 vis_pcs = [torch.Tensor(loaders['test'].dataset.pointclouds[ex]) for ex in examples_to_visualize]
-print(vis_pcs[0].shape)
-vis_recons, _ = model.reconstruct(torch.stack(vis_pcs).to(device), device=device)
-vis_recons = vis_recons.detach().cpu().numpy()
+vis_pcs = torch.stack(vis_pcs).to(device)
+vis_reconsx, z = model.reconstruct(vis_pcs, device=device)
+vis_recons = vis_reconsx.detach().cpu().numpy()
+colors = model.predict(z, vis_pcs)
+colors = F.log_softmax(colors, dim=1).argmax(dim=1).detach().cpu().numpy()
 for i,ex in enumerate(examples_to_visualize):
-    plot_3d_point_cloud(loaders['test'].dataset.pointclouds[ex], show=False)
+    plot_3d_point_cloud(loaders['test'].dataset.pointclouds[ex], show=False, c=colors[i])
     plt.savefig(f'{ex}_{model_tag}_plottedpc.pdf')
     plot_3d_point_cloud(vis_recons[i], show=False)
     plt.savefig(f'{ex}_{model_tag}_plottedrecon.pdf')
