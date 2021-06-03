@@ -54,7 +54,7 @@ class PointcloudAutoencoder(nn.Module):
         self.train()
         loss_meter = AverageMeter()
         for batch in tqdm(loader):
-            optimizer.zero_grad()
+            if optimizer is not None: optimizer.zero_grad()
             pc = batch['point_cloud']
             # for k, v in batch.items():
             #     if isinstance(v, torch.Tensor): print(k, v.shape)
@@ -62,8 +62,9 @@ class PointcloudAutoencoder(nn.Module):
             recons = self.reconstruct(pc, device=device)
             loss = chamfer_loss(recons, pc).mean()
             loss_meter.update(loss, pc.size(0))
-            loss.backward()
-            optimizer.step()
+            if optimizer is not None:
+                loss.backward()
+                optimizer.step()
         return loss_meter.avg
 
     # @torch.no_grad()
